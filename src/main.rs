@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, fs};
+use std::{collections::HashMap, env, fs::{self, File}, io::{self, Write}};
 
 //Special
 pub const HALT: u32 = 0; //Done
@@ -260,7 +260,7 @@ fn main() {
     let mut assembly: Vec<Vec<&str>> = Vec::new();
     let mut symbol_table: HashMap<&str, u32> = HashMap::new();
     let mut to_remove: Vec<usize> = Vec::new();
-    let mut code = String::new();
+    let mut words: Vec<u32> = Vec::new();
 
     // Split lines in file
     for line in assembly_string.lines() {
@@ -289,8 +289,8 @@ fn main() {
     for line in assembly {
         let mut opcode = line[0].to_string();
         if line[0] == "HALT" {
-            let out = instr_fields_to_decimal(0, 0, 0, 0, 0, InstructionType::Halt).to_string();
-            code.push_str(&out);
+            let out = instr_fields_to_decimal(0, 0, 0, 0, 0, InstructionType::Halt);
+            words.push(out);
         }
         // Check ALU operations
         else if line[0] == "ADD" || line[0] == "SUB" || line[0] == "MUL" || line[0] == "DIV" || line[0] == "MOD" || line[0] == "AND" || line[0] == "OR" || line[0] == "NOT" || line[0] == "XOR" || line[0] == "LS" || line[0] == "RS" || line[0] == "LSL" || line[0] == "LSR" || line[0] == "GDD" || line[0] == "GUB" || line[0] == "GUL" || line[0] == "GIV" {
@@ -298,14 +298,14 @@ fn main() {
             if line[2].starts_with("R") {
                 opcode.push_str("_RR");
                 let tf = (line[0] == "GDD" || line[0] == "GUB" || line[0] == "GUL" || line[0] == "GIV") as u32;
-                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), ret_reg(line[3]), InstructionType::ALU).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), ret_reg(line[3]), InstructionType::ALU);
+                words.push(out);
             } else {
                 // Register-Immediate
                 opcode.push_str("_RI");
                 let tf = (line[0] == "GDD" || line[0] == "GUB" || line[0] == "GUL" || line[0] == "GIV") as u32;
-                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), line[2].parse().unwrap(), ret_reg(line[3]), InstructionType::ALU).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), line[2].parse().unwrap(), ret_reg(line[3]), InstructionType::ALU);
+                words.push(out);
             }
         }
         // Check control operations
@@ -321,32 +321,32 @@ fn main() {
                 }
                 if line[1] == "PC" {
                     opcode.push_str("_PC");
-                    let out = instr_fields_to_decimal(tf, ret_op(&opcode), 0, offset, 0, InstructionType::Control).to_string();
-                    code.push_str(&out);
+                    let out = instr_fields_to_decimal(tf, ret_op(&opcode), 0, offset, 0, InstructionType::Control);
+                    words.push(out);
                 }
                 opcode.push_str("_I");
-                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), offset, 0, InstructionType::Control).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), offset, 0, InstructionType::Control);
+                words.push(out);
             } else {
                 // Immediate
                 opcode.push_str("_D");
-                let out = instr_fields_to_decimal(0, ret_op(&opcode), symbol_table[line[1]], 0, 0, InstructionType::Control).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(0, ret_op(&opcode), symbol_table[line[1]], 0, 0, InstructionType::Control);
+                words.push(out);
             }
         }
         else if line[0] == "CMP" {
             if line[2].starts_with("R") {
                 opcode.push_str("_RR");
-                let out = instr_fields_to_decimal(0, ret_reg(&opcode), ret_reg(line[1]), ret_reg(line[2]), 0, InstructionType::Control).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(0, ret_reg(&opcode), ret_reg(line[1]), ret_reg(line[2]), 0, InstructionType::Control);
+                words.push(out);
             } else {
                 opcode.push_str("_RI");
-                let out = instr_fields_to_decimal(0, ret_reg(&opcode), ret_reg(line[1]), line[2].parse().unwrap(), 0, InstructionType::Control).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(0, ret_reg(&opcode), ret_reg(line[1]), line[2].parse().unwrap(), 0, InstructionType::Control);
+                words.push(out);
             }
         }
         else if line[0] == "RET" {
-            code.push_str(&(instr_fields_to_decimal(0, RET, 0, 0, 0, InstructionType::Control).to_string()));
+            words.push(instr_fields_to_decimal(0, RET, 0, 0, 0, InstructionType::Control));
         }
         // Check memory operations
         else if line[0] == "LDR" || line[0] == "STR" || line[0] == "GDR" || line[0] == "GTR" {
@@ -355,36 +355,46 @@ fn main() {
             if tf == 1 {offset = line[3].parse().unwrap();}
             if line[1] == "PC" {
                 opcode.push_str("_PC");
-                let out = instr_fields_to_decimal(tf, ret_op(&opcode), 0, ret_reg(line[2]), offset, InstructionType::Memory).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(tf, ret_op(&opcode), 0, ret_reg(line[2]), offset, InstructionType::Memory);
+                words.push(out);
             } else if line[1].starts_with("%") {
                 opcode.push_str("_I");
-                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), offset, InstructionType::Memory).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), offset, InstructionType::Memory);
+                words.push(out);
             }
             else {
                 opcode.push_str("_D");
-                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), offset, InstructionType::Memory).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(tf, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), offset, InstructionType::Memory);
+                words.push(out);
             }
         }
         else if line[0] == "PUSH" || line[0] == "POP" {
             if line[2] == "LR" {
                 opcode.push_str("_LR");
-                let out = instr_fields_to_decimal(0, ret_op(&opcode), ret_reg(line[1]), 0, 0, InstructionType::Memory).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(0, ret_op(&opcode), ret_reg(line[1]), 0, 0, InstructionType::Memory);
+                words.push(out);
             } else {
-                let out = instr_fields_to_decimal(0, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), 0, InstructionType::Memory).to_string();
-                code.push_str(&out);
+                let out = instr_fields_to_decimal(0, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), 0, InstructionType::Memory);
+                words.push(out);
             }
         }
         else if line[0] == "FDR" || line[0] == "FTR"{
-            code.push_str(&(instr_fields_to_decimal(0, ret_op(line[0]), 0, 0, 0, InstructionType::Control).to_string()));
+            words.push(instr_fields_to_decimal(0, ret_op(line[0]), 0, 0, 0, InstructionType::Control));
         }
     }
 
     // Save to file
     let mut save_path = path.to_owned();
     save_path.push_str(".bin");
-    fs::write(save_path, code.as_bytes()).expect("Couldn't write to file!");
+    let file: std::result::Result<File, io::Error> = File::create(save_path);
+    match file {
+        Result::Ok(mut f) => {
+            for word in words {
+                let _ = f.write_all(&word.to_le_bytes());
+            }
+        }    
+        Result::Err(_x) => {
+            return;
+        }
+    }    
 }
