@@ -368,10 +368,10 @@ fn main() {
                 words.push(out);
             }
         }
-        else if line[0] == "PUSH" || line[0] == "POP" {
+        else if line[0] == "PSH" || line[0] == "POP" {
             if line[2] == "LR" {
                 opcode.push_str("_LR");
-                let out = instr_fields_to_decimal(0, ret_op(&opcode), ret_reg(line[1]), 0, 0, InstructionType::Memory);
+                let out = instr_fields_to_decimal(0, ret_op(&opcode), 0, 0, 0, InstructionType::Memory);
                 words.push(out);
             } else {
                 let out = instr_fields_to_decimal(0, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), 0, InstructionType::Memory);
