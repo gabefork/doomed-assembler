@@ -271,13 +271,12 @@ fn main() {
     // Find symbols
     let mut cur_address: u32 = 0;
     for (i, line) in assembly.iter().enumerate() {
-        if line.len() == 1 {
-            if line[0].starts_with(".") {
+        if line.len() == 1 && line[0].starts_with(".") {
                 symbol_table.insert(line[0], cur_address);
                 to_remove.push(i);
-            }
+        } else {
+            cur_address += 1;
         }
-        cur_address += 1;
     }
 
     // Remove symbols from main assembly
@@ -337,11 +336,11 @@ fn main() {
         else if line[0] == "CMP" {
             if line[2].starts_with("R") {
                 opcode.push_str("_RR");
-                let out = instr_fields_to_decimal(0, ret_reg(&opcode), ret_reg(line[1]), ret_reg(line[2]), 0, InstructionType::Control);
+                let out = instr_fields_to_decimal(0, ret_op(&opcode), ret_reg(line[1]), ret_reg(line[2]), 0, InstructionType::Control);
                 words.push(out);
             } else {
                 opcode.push_str("_RI");
-                let out = instr_fields_to_decimal(0, ret_reg(&opcode), ret_reg(line[1]), line[2].parse().unwrap(), 0, InstructionType::Control);
+                let out = instr_fields_to_decimal(0, ret_op(&opcode), ret_reg(line[1]), line[2].parse().unwrap(), 0, InstructionType::Control);
                 words.push(out);
             }
         }
