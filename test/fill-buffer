@@ -1,0 +1,12 @@
+ADD R3 2047 R3
+MUL R3 37 R4
+ADD R4 1061 R4
+.loop_start
+GTR R0 R0
+ADD R0 1 R0
+CMP R0 R4
+JL .loop_start
+JE .end
+.end
+HALT
+
