@@ -380,6 +380,14 @@ fn main() {
         else if line[0] == "FDR" || line[0] == "FTR"{
             words.push(instr_fields_to_decimal(0, ret_op(line[0]), 0, 0, 0, InstructionType::Control));
         }
+        else if line[0] == "data" {
+            // Only append data after program code!
+            // Data is in the format "data = 1234 1234 1234 1234"
+            // Numbers are separated by only spaces and must be on the same line
+            for i in 2..line.len() {
+                words.push(line[i].parse::<u32>().unwrap());
+            }
+        }
     }
 
     // Save to file
